@@ -90,6 +90,9 @@ type FullStack = FxAppend[GreasyStack, LogicTableStack]
 
 ## Providing sample input
 
+The logictable interpreter will show the output of the journey (if it succeeded,
+or the error if it failed), along with every question asked and answer given.
+
 ```tut
 import org.atnos.eff.syntax.all._
 
@@ -99,5 +102,35 @@ val output = greasySpoon[FullStack].
     case "age" => List(10,50,100)
     case _     => List(1,2,3)
   }.
-  runEither.runWriter.runList.run
+  runEither.runWriter.runList.run.
+    take(10).map(println)
+```
+
+The logictable interpreter will show the output of the journey (if it succeeded,
+or the error if it failed), along with every question asked and answer given.
+
+## Writing unit tests 
+
+In order to unit-test your journey simply describe the scenarios you want to
+test and check the output is what you expect. 
+
+```tut:silent
+import org.atnos.eff.syntax.all._
+import org.scalatest._
+
+class GreasySpec extends FlatSpec with Matchers {
+
+  "The greasySpoon program" should "never charge for seating" in {
+    val output = greasySpoon[FullStack].
+      giveExamples(List(false)).
+      giveExamples{
+        case "age" => (1 to 100).toList
+        case _     => List(0)
+      }.
+      runEither.runWriter.runList.run
+      
+    output.forall(_._1 == Right(0)) should be (true)
+  }
+
+}
 ```

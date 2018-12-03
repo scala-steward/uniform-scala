@@ -1,6 +1,7 @@
 ---
 layout: home
-
+title: Setup
+position: 1
 ---
 
 # Installation - core uniform only
