@@ -2,22 +2,11 @@ package ltbs.uniform
 
 import cats.data.Validated
 import cats.implicits._
-import org.atnos.eff.Eff
 
 sealed trait UniformSelect[L,V] {
   def key: String
   def validation: V => Validated[String,V]
 }
-
-case class UniformAsk[L, V](
-  key: String,
-  validation: V => Validated[String,V] = {v:V => v.valid}
-)
-
-case class UniformSubjourney[L, V](
-  key: String,
-  components: Eff[L,V]
-)
 
 case class UniformSelectOne[L, V](
   key: String,

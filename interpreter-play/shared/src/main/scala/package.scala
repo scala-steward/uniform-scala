@@ -11,7 +11,7 @@ import ltbs.uniform.common.web.SimpleInteractionForm
 
 package object playframework {
 
-  type PlayForm[A] = SimpleInteractionForm[Request[AnyContent],A,Html]
+  type PlayForm[T,A] = SimpleInteractionForm[Request[AnyContent],T,A,Html]
 
   type Encoded = String
   type DB = Map[String,Encoded]
@@ -23,11 +23,11 @@ package object playframework {
       new Form[B](fa.mapping.transform(f, g), fa.data, fa.errors, fa.value.map(f))
   }
 
-  implicit val invariantWebMonad: Invariant[WebMonadForm] = new Invariant[WebMonadForm] {
-    def imap[A, B](fa: WebMonadForm[A])(f: A => B)(g: B => A): WebMonadForm[B] = new WebMonadForm[B]{
+  implicit def invariantWebMonad[T]: Invariant[WebMonadForm[T,?]] = new Invariant[WebMonadForm[T,?]] {
+    def imap[A, B](fa: WebMonadForm[T,A])(f: A => B)(g: B => A): WebMonadForm[T,B] = new WebMonadForm[T,B]{
 
-      def render(key: String, existing: Input, errors: ErrorTree, breadcrumbs: List[String]): Html =
-        fa.render(key, existing, errors, breadcrumbs)
+      def render(key: String, existing: Input, tell: T, errors: ErrorTree, breadcrumbs: List[String]): Html =
+        fa.render(key, existing, tell, errors, breadcrumbs)
 
       def fromRequest(key: String, request: Request[AnyContent]): Either[ErrorTree, B] =
         fa.fromRequest(key, request).map(f)
@@ -57,20 +57,20 @@ package object playframework {
     }
   }
 
-  def inferWebMonadForm[A](chrome: (String, ErrorTree, Html, List[String]) => Html)
+  def inferWebMonadForm[T,A](chrome: (String, ErrorTree, Html, List[String]) => Html)
   (implicit
      parser: DataParser[A],
-    html: HtmlForm[A],
+    html: HtmlForm[T,A],
     messages: Messages
-  ): WebMonadForm[A] = new WebMonadForm[A] {
+  ): WebMonadForm[T,A] = new WebMonadForm[T,A] {
 
     def fromRequest(key: String,request: Request[AnyContent]): Either[ErrorTree,A] = {
       val inputText = request.body.asText.get
       parser.bind(decodeInput(inputText))
     }
 
-    def render(key: String, input: Input, errors: ErrorTree, breadcrumbs: List[String]): Html =
-      chrome(key, errors, html.render(key, input, errors, messages), breadcrumbs.reverse)
+    def render(key: String, input: Input, tell:T, errors: ErrorTree, breadcrumbs: List[String]): Html =
+      chrome(key, errors, html.render(key, input, tell, errors, messages), breadcrumbs.reverse)
 
     def toTree(in: A): Input = parser.unbind(in)
 

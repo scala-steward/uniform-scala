@@ -8,16 +8,52 @@ import cats.Monoid
 
 package object uniform {
 
-  type _uniform[V,R] = UniformAsk[V,?] |= R
+  type _uniform[V,S] = UniformInteraction[?,Unit,V] |= S
   type _uniformSelect[V,R] = UniformSelect[V,?] |= R
 
-  def uask[R, T](key: String, validation: T => Validated[String,T] = {v:T => v.valid})(implicit member: UniformAsk[T, ?] |= R): Eff[R, T] =
-    send[UniformAsk[T, ?], R, T](UniformAsk(key, validation))
+  type UniformAsk[STACK, A] = UniformInteraction[STACK, Unit, A]
+  type UniformTell[STACK, A] = UniformInteraction[STACK, A, Unit]
+  type UniformEnd[STACK, A] = UniformInteraction[STACK, A, Nothing]    
 
-  def uaskOneOf[R, T](key: String, options: Set[T], validation: T => Validated[String,T] = {v:T => v.valid})(implicit member: UniformSelect[T, ?] |= R): Eff[R, T] =
+  def interact[R, TELL, ASK](
+    key: String,
+    value: TELL,
+    validation: ASK => Validated[String,ASK] = {v:ASK => v.valid}
+  )(
+    implicit member: UniformInteraction[?, TELL, ASK] |= R
+  ): Eff[R, (TELL,ASK)] = send[UniformInteraction[?, TELL, ASK], R, (TELL,ASK)](
+    UniformInteraction(key, value, validation)
+  )
+
+  def ask[R, T](
+    key: String,
+    validation: T => Validated[String,T] = {v:T => v.valid}
+  )(
+    implicit member: UniformInteraction[?, Unit, T] |= R
+  ): Eff[R, (Unit,T)] = interact[R, Unit, T](key, (), validation)
+
+  def tell[R, T](
+    key: String,
+    value: T
+  )(
+    implicit member: UniformInteraction[?, T, Unit] |= R
+  ): Eff[R, (T,Unit)] = interact[R, T, Unit](key, value)
+
+  def end[R, T](
+    key: String,
+    value: T
+  )(
+    implicit member: UniformInteraction[?, T, Nothing] |= R
+  ): Eff[R, (T,Nothing)] = interact[R, T, Nothing](key, value)
+
+  def askOneOf[R, T](
+    key: String,
+    options: Set[T],
+    validation: T => Validated[String,T] = {v:T => v.valid}
+  )(implicit member: UniformSelect[T, ?] |= R): Eff[R, T] =
     send[UniformSelect[T, ?], R, T](UniformSelectOne(key, options, validation))
 
-  def uaskNOf[R, T](
+  def askNOf[R, T](
     key: String,
     options: Set[T],
     min: Int = 0,
@@ -53,8 +89,4 @@ package object uniform {
   def when[R, A](b: => Boolean)(wm: Eff[R, A]): Eff[R,Option[A]] =
     if(b) wm.map{_.some} else Eff.pure[R,Option[A]](none[A])
 
-}
-
-package uniform {
-	object UniformEffect {} 
 }

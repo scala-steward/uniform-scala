@@ -7,15 +7,13 @@ import enumeratum._
 
 object BeardTax { 
 
-  type Name        = (String, String)
-  type BeardLength = (Int, Int)
-
   case class MemberOfPublic(
     forename: String,
     surname: String,
     age: java.time.LocalDate
   )
 
+  type BeardLength = (Int, Int)
 
   sealed trait BeardStyle extends EnumEntry
   object BeardStyle extends Enum[BeardStyle] {
@@ -25,29 +23,31 @@ object BeardTax {
     case object Gunslinger       extends BeardStyle
     case object MuttonChops      extends BeardStyle
     case object SoulPatch        extends BeardStyle
-    case object LaughingCavalier extends BeardStyle            
+    case object LaughingCavalier extends BeardStyle
+    case object LukaszStyle      extends BeardStyle                
   }
 
-  type TestProgramStack = Fx3[
-    UniformAsk[Option[MemberOfPublic],?],
-    UniformAsk[BeardStyle,?],
-    UniformAsk[BeardLength,?]
+  type TestProgramStack = Fx1[
+    // UniformInteraction[?,Unit,Option[MemberOfPublic]],    
+    // UniformAsk[?,BeardStyle],
+    UniformAsk[?,Int]
   ]
 
   def costOfBeard(length: BeardLength): Int =
     length._1 + (length._2 - length._1) / 2
 
   def program[R
-      : _uniform[Option[MemberOfPublic],?]
-      : _uniform[BeardStyle,?]
-      : _uniform[BeardLength,?]
+      // : _uniform[Option[MemberOfPublic],?]
+      // : _uniform[BeardStyle,?]
+      : _uniform[Int,?]
   ]: Eff[R, Int] =
     for {
-      memberOfPublic <- uask[R, Option[MemberOfPublic]]("is-public")
-      beardStyle     <- uask[R, BeardStyle]("beard-style")            
-      beardLength    <- uask[R, BeardLength]("beard-length-mm", validation = {
-        case a@(l,h) => if (l > h) "lower-exceeds-higher".invalid else a.valid
-      }) emptyUnless (memberOfPublic.isDefined)
-    } yield costOfBeard(beardLength)
+      // memberOfPublic <- interact[R, Unit, Option[MemberOfPublic]]("is-public", ())
+      // beardStyle     <- ask[R, BeardStyle]("beard-style")            
+      beardLength    <- interact[R, Unit, Int](
+        "beard-length-mm",
+        Unit).map(_._2)
+    } yield costOfBeard((beardLength,0))
+
 
 }

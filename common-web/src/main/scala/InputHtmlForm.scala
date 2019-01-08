@@ -5,11 +5,11 @@ import ltbs.uniform.datapipeline._
 import play.twirl.api.Html
 import java.net.URLDecoder.{decode => urldecode}
 
-class InputHtmlForm[A](
+class InputHtmlForm[T,A](
   parser: DataParser[A],
-  html: HtmlForm[A],
+  html: HtmlForm[T,A],
   messages: Messages
-) extends SimpleInteractionForm[Input,A,Html] {
+) extends SimpleInteractionForm[Input,T, A,Html] {
 
   def decode(out: Encoded): Either[ErrorTree,A] = {
     val urlEncoded = decodeUrlString(out)
@@ -18,8 +18,8 @@ class InputHtmlForm[A](
 
   def encode(in: A): Encoded = receiveInput(parser.unbind(in))
   def receiveInput(data: Input): Encoded = encodeInput("root", data)
-  def render(key: String, existing: Option[Encoded], data: Input, errors: ErrorTree): Html =
-    html.render(key, data, errors, messages)
+  def render(key: String, existing: Option[Encoded], data: Input, tell: T, errors: ErrorTree): Html =
+    html.render(key, data, tell, errors, messages)
 
   // TODO: No more bodged, non stack-safe tree implementations 
   private def encodeInput(key:String, in: Input): String = {
