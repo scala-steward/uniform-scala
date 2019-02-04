@@ -19,6 +19,12 @@
 
     @if(conditional.isDefinedAt(opt)) { 
       <div id="conditional-@keyNoDots-@opt" class="conditional-@keyNoDots @if(existing.exists(_ == opt)){govuk-checkboxes__conditional} else {govuk-checkboxes__conditional--hidden}" aria-hidden="false">
+        @messages.get(s"$key.$opt.subtitle").map { subtitle =>
+	  <label class="govuk-label" for="@key.@opt">
+	    @if(conditional(opt).toString.contains("<label")) {<strong>}
+	      @subtitle
+	    @if(conditional(opt).toString.contains("<label")) {</strong>}
+  	  </label> }
         @conditional(opt)
       </div>
     }

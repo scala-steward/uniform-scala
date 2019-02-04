@@ -6,7 +6,7 @@
   @for((opt,num) <- options.zipWithIndex) {  
     <div class="govuk-radios__item" data-target="@keyNoDots">
       <input class="govuk-radios__input" id="@keyNoDots-@num" name="@key" type="radio" value="@opt" aria-describedby="@keyNoDots-@num-item-hint" @if(existing.exists(_ == opt)){ checked } @if(conditional.isDefinedAt(opt)) {aria-controls="ting" aria-expanded="true"}>
-      <label class="govuk-label govuk-radios__label govuk-label--s" for="@keyNoDots-@num">
+      <label class="govuk-label govuk-radios__label" for="@keyNoDots-@num">
         @messages.decompose(s"$key.$opt")
       </label>
       @messages.get(s"$key.$opt.hint").map { hint => 
@@ -16,8 +16,14 @@
       }
     </div>
 
-    @if(conditional.isDefinedAt(opt)) { 
+    @if(conditional.isDefinedAt(opt)) {       
       <div id="conditional-@keyNoDots-@opt" class="conditional-@keyNoDots @if(existing.exists(_ == opt)){govuk-radios__conditional} else {govuk-radios__conditional--hidden}" aria-hidden="false">
+        @messages.get(s"$key.$opt.subtitle").map { subtitle =>
+	  <label class="govuk-label" for="@key.@opt">
+	    @if(conditional(opt).toString.contains("<label")) {<strong>}
+	      @subtitle
+	    @if(conditional(opt).toString.contains("<label")) {</strong>}
+  	  </label> }
         @conditional(opt)
       </div>
     }
