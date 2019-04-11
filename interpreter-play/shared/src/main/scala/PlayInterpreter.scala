@@ -88,7 +88,7 @@ trait PlayInterpreter extends Compatibility.PlayController {
                 UniformCore(state, breadcrumbs, _) = g
                 dbObject: Option[OUT] = {
                   val o = state.get(id).flatMap(
-                    wmFormOUT(id).decode(_).flatMap(validation(_).toEither) match {
+                    wmFormOUT(id).decode(_).flatMap(validation.combinedValidation(_).toEither) match {
                       case Left(e) =>
                         log.warn(s"$id - serialised data present, but failed validation - $e")
                         None
@@ -125,12 +125,16 @@ trait PlayInterpreter extends Compatibility.PlayController {
                     val data: Encoded =
                       wmForm.receiveInput(request)
 
-                    def validationToErrorTree[V](f: V => Validated[String,V]): V => Either[ErrorTree,V] = {
-                      x => f(x).toEither.leftMap(Tree(_))
+                    def validationToErrorTree[V](f: V => ValidatedNel[ValidationError,V]): V => Either[ErrorTree,V] = {
+                      x => f(x).toEither.leftMap{err => Tree(err.toList)}
                     }
 
                     def v(in: X): Either[ErrorTree, X] = {
-                      validationToErrorTree(validation)(in.asInstanceOf[OUT]).map{_.asInstanceOf[X]}
+                      val validationResult = validation.combinedValidation(in.asInstanceOf[OUT])
+                      validationResult.toEither
+                        .leftMap{err => Tree(err.toList.map{case ErrorMsg(msg, args) => msg})}
+                        .map(_.asInstanceOf[X])
+//                      validationToErrorTree{validation.combinedValidation.apply}(in.asInstanceOf[OUT]).map{_.asInstanceOf[X]}
                     }
 
                     wmForm.decode(data).flatMap(v) match {

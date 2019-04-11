@@ -1,7 +1,6 @@
 package ltbs.uniform
 
 import cats.implicits._
-import cats.arrow.Profunctor
 import cats.{Invariant,Monoid}
 import play.twirl.api.Html
 import scala.language.implicitConversions

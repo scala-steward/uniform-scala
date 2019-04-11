@@ -1,7 +1,6 @@
 package ltbs
 
 import org.atnos.eff._
-import cats.data.Validated
 import org.atnos.eff.all.{none => _, _}
 import cats.implicits._
 import cats.{Monoid,Functor}
@@ -19,10 +18,7 @@ package object uniform {
   type _uniformTell[IN, R] = UniformTell[IN,?] |= R
 
   type Encoded = String
-  type ErrorTree = Tree[String,String]  
-
-  type _uniformList[STACK,SUB] = UniformAskList[SUB,?] |= STACK
-  type _uniformSelect[STACK,SUB] = UniformSelect[SUB,?] |= STACK
+  type ErrorTree = Tree[String,List[String]]
 
   type DB = Map[List[String],Encoded]
 
@@ -35,6 +31,8 @@ package object uniform {
         x <- send[Uniform[IN,OUT,?], R, OUT](Uniform(predKeys :+ key,tell,default,validation,customContent))
       } yield (x)
     }
+
+  implicit def stringToValidationError(in: String): ValidationError = ValidationError(in)
 
   def core[STACK : _uniformCore] = get[STACK,UniformCore]
   def coreMod[STACK : _uniformCore](f: UniformCore => UniformCore) =
@@ -91,24 +89,16 @@ package object uniform {
   } yield (a)
 
   def ask[OUT](key: String) =
-    UniformB[Unit,OUT](key, (), None, {v:OUT => v.valid}, Map.empty)
+    UniformB[Unit,OUT](key, (), None, Nil, Map.empty)
 
   def tell[IN](key: String)(value: IN) =
-    UniformB[IN,Unit](key, value, None, {v:Unit => v.valid}, Map.empty)
+    UniformB[IN,Unit](key, value, None, Nil, Map.empty)
 
   def dialogue[IN,OUT](key: String)(value: IN) =
-    UniformB[IN,OUT](key, value, None, {v:OUT => v.valid}, Map.empty)
+    UniformB[IN,OUT](key, value, None, Nil, Map.empty)
 
   def end[IN](key: String)(value: IN) =
-    UniformB[IN,Unit](key, value, None, {_:Unit => "journey.end".invalid}, Map.empty)
-
-  def uniformP[IN,OUT,R :_uniform[IN, OUT, ?]](
-    key: List[String],
-    tell: IN,
-    default: Option[OUT] = None,
-    validation: OUT => Validated[String,OUT] = {v:OUT => v.valid}
-  ): Eff[R, OUT] =
-    send[Uniform[IN,OUT,?], R, OUT](Uniform(key,tell,default,validation, Map.empty))
+    UniformB[IN,Nothing](key, value, None, Nil, Map.empty)
 
   implicit class RichMonoidOps[R, A](e: Eff[R, A])(implicit monoid: Monoid[A]) {
     
@@ -153,24 +143,24 @@ package object uniform {
     }
   }
 
-  implicit def contentMonoidInstance[A] = new Monoid[UniformMessages[A]] {
-    def empty: UniformMessages[A] = NoopMessages[A]
-    def combine(a: UniformMessages[A], b: UniformMessages[A]):UniformMessages[A] = new UniformMessages[A] {
-      def get(key: String, args: Any*): Option[A] = a.get(key, args:_*).orElse(b.get(key, args:_*))
-      override def get(key: List[String], args: Any*): Option[A] = a.get(key, args:_*).orElse(b.get(key, args:_*))
-      def list(key: String, args: Any*): List[A] = a.list(key, args:_*) |+| b.list(key, args:_*)
-      override def decompose(key: String, args: Any*): A = a.decomposeOpt(key, args:_*).getOrElse(b.decompose(key, args:_*))
-
-      override def apply(key: String, args: Any*): A = 
-         a.get(key, args:_*).getOrElse(b(key, args:_*))
-
-      override def apply(keys: List[String], args: Any*): A =
-         a.get(keys, args:_*).getOrElse(b(keys, args:_*))        
-    }
-  }
-
   implicit val contentFunctorInstance = new Functor[UniformMessages] {
     def map[A,B](fa: UniformMessages[A])(f: A => B): UniformMessages[B] = fa.map(f)
   }
+
+  implicit class RichPredicate[A](inner: A => Boolean) {
+    def toValidationRule(msg: String, args: Any*) =
+      ValidationRule.fromPred(inner, ErrorMsg(msg, args:_*))
+  }
+
+  implicit class RichValidationRuleListList[A](inner: List[List[ValidationRule[A]]]) {
+    def combinedValidation: ValidationRule[A] =
+      inner
+        .map(_.combineAll)
+        .fold(cats.Monoid[ValidationRule[A]].empty){(x,y) =>
+          y andThen x
+        }
+
+  }
+
 
 }

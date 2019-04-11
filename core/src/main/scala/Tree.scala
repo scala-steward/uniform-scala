@@ -9,7 +9,7 @@ case class Tree[K,V](
 ) {
   def get(key: K): Either[ErrorTree,Tree[K,V]] = children.get(key) match {
     case Some(x) => x.asRight[ErrorTree]
-    case None    => Tree("", Map(key.toString -> Tree[String,String]("required"))).asLeft[Tree[K,V]]
+    case None    => Tree(Nil, Map(key.toString -> Tree[String,List[String]](List("required")))).asLeft[Tree[K,V]]
   }
 
   def add(key: K, newValue: Tree[K,V]): Tree[K,V] = Tree(value, children + (key -> newValue))

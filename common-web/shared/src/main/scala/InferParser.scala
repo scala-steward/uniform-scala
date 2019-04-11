@@ -30,7 +30,7 @@ object InferParser {
           case (Right(h), Right(t)) => Right((field[K](h) :: t))
           case (Left(he), Left(te)) => Left(te.add(fieldName, he))
           case (_,        Left(te)) => Left(te)
-          case (Left(he), _)        => Left(Tree("",Map(fieldName -> he)))
+          case (Left(he), _)        => Left(Tree(Nil,Map(fieldName -> he)))
         }
       }
 

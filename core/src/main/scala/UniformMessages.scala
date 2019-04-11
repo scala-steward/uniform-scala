@@ -2,6 +2,7 @@ package ltbs.uniform
 
 import scala.util.parsing.combinator._
 import cats.Monoid
+import cats.implicits._
 
 trait UniformMessages[A] {
   def apply(key: String, args: Any*): A =
@@ -74,6 +75,23 @@ trait UniformMessages[A] {
 }
 
 object UniformMessages {
+
+  implicit def contentMonoidInstance[A]: Monoid[UniformMessages[A]] = new Monoid[UniformMessages[A]] {
+    def empty: UniformMessages[A] = NoopMessages[A]
+    def combine(a: UniformMessages[A], b: UniformMessages[A]):UniformMessages[A] = new UniformMessages[A] {
+      def get(key: String, args: Any*): Option[A] = a.get(key, args:_*).orElse(b.get(key, args:_*))
+      override def get(key: List[String], args: Any*): Option[A] = a.get(key, args:_*).orElse(b.get(key, args:_*))
+      def list(key: String, args: Any*): List[A] = a.list(key, args:_*) |+| b.list(key, args:_*)
+      override def decompose(key: String, args: Any*): A = a.decomposeOpt(key, args:_*).getOrElse(b.decompose(key, args:_*))
+
+      override def apply(key: String, args: Any*): A = 
+         a.get(key, args:_*).getOrElse(b(key, args:_*))
+
+      override def apply(keys: List[String], args: Any*): A =
+         a.get(keys, args:_*).getOrElse(b(keys, args:_*))        
+    }
+  }
+
   def fromMap[A](msg: Map[String,List[A]]): UniformMessages[A] = SimpleMapMessages[A](msg)
   def fromMapWithSubstitutions(msg: Map[String,List[String]]): UniformMessages[String] = MapMessagesWithSubstitutions(msg)  
   def noop[A]: UniformMessages[A] = NoopMessages[A]
@@ -94,6 +112,7 @@ object UniformMessages {
   }
 
   def bestGuess: UniformMessages[String] = BestGuessMessages
+
 }
 
 case class SimpleMapMessages[A](msg: Map[String,List[A]]) extends UniformMessages[A] {
@@ -157,7 +176,6 @@ case class EmptyMessages[A]()(implicit mon: Monoid[A]) extends UniformMessages[A
   def list(key: String, args: Any*): List[A] = Nil
 }
 
-
 object BestGuessMessages extends RegexParsers with UniformMessages[String] {
 
   override def apply(key: String, args: Any*): String =
@@ -184,8 +202,8 @@ object BestGuessMessages extends RegexParsers with UniformMessages[String] {
     parse(camel,key.replaceFirst("[.](heading|option)$","").split("[.]").last) match {
       case Success(Nil,_) => key
       case Success((firstWord::rest),_) => (titleCase(firstWord) :: rest).mkString(" ")
-      case Failure(msg,_) => key
-      case Error(msg,_) =>   key
+      case Failure(_,_) => key
+      case Error(_,_) =>   key
     }
   }
 }
