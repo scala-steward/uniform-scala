@@ -3,25 +3,19 @@ package ltbs.uniform
 import cats.implicits._
 import org.atnos.eff.Eff
 
-case class ValidationError(
-  msgKey: String,
-  path: String = "",
-  args: List[Any] = Nil
-)
-
 case class UniformB[IN, OUT] private (
   key: String,
   tell: IN,
   default: Option[OUT],
-  validation: List[List[ValidationRule[OUT]]],  
+  validation: List[List[ValidationRule[OUT]]],
   customContent: Map[String,(String,List[Any])]
 ) {
 
   def validating(newRules: ValidationRule[OUT]*): UniformB[IN, OUT] = this.copy(
-    validation=newRules.toList :: validation 
+    validation=newRules.toList :: validation
   )
 
-  def combinedValidation: ValidationRule[OUT] = 
+  def combinedValidation: ValidationRule[OUT] =
     validation
       .map(_.combineAll)
       .fold(cats.Monoid[ValidationRule[OUT]].empty){(x,y) =>
@@ -54,47 +48,20 @@ case class UniformB[IN, OUT] private (
   }
 
   def in[R :_uniform[IN, OUT, ?]  : _uniformCore]: Eff[R,OUT] = uniformBToStack(this)
-} 
+}
 
 case class Uniform[IN, OUT, STACK] private (
   key: List[String],
   tell: IN,
   default: Option[OUT],
-  validation: List[List[ValidationRule[OUT]]],  
-  customContent: Map[String,(String,List[Any])]  
+  validation: List[List[ValidationRule[OUT]]],
+  customContent: Map[String,(String,List[Any])]
 ) {
 
   def defaultingTo(out: OUT): Uniform[IN, OUT, STACK] =
     Uniform(key,tell,Some(out), validation, customContent)
-  
+
 }
-
-// object UniformAsk {
-//   def unapply[STACK, IN, OUT](
-//     in: Uniform[IN, OUT, STACK]
-//   ): Option[(List[String], Option[OUT], OUT => ValidatedNel[ValidationError,OUT])] =
-//     in match {
-//       case Uniform(key, _, default, validation, _) => Some((key,default, validation))
-//     }
-// }
-
-// object UniformTell {
-//   def unapply[STACK, IN, OUT](
-//     in: Uniform[IN, OUT, STACK]
-//   ): Option[(List[String], IN)] =
-//     in match {
-//       case Uniform(key, tell, _, _, _) => Some((key,tell))
-//     }
-// }
-
-
-// case class UniformAskList[L, V](
-//   key: List[String],
-//   min: Int = 0,
-//   max: Int = Int.MaxValue,
-//   validationElement: V => Validated[String,V] = {v:V => v.valid},
-//   validationList: List[V] => Validated[String,List[V]] = {v:List[V] => v.valid}    
-// )
 
 case class UniformSubjourney[L, V](
   key: String,

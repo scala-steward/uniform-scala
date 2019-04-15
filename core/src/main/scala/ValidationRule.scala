@@ -4,9 +4,13 @@ import cats.implicits._
 import cats.Monoid
 import cats.data.ValidatedNel
 
-case class ErrorMsg(msg: String, args: Any*)
+case class ErrorMsg(msg: String, args: Any*) {
+  def render[A](msgProvider: UniformMessages[A]): A =
+    msgProvider(msg, args:_*)
+}
 
 trait ValidationRule[A] {
+
   def errorsFor(in: A): List[ErrorMsg]
   def apply(in: A): ValidatedNel[ErrorMsg, A] = errorsFor(in).toNel match {
     case None => in.valid
@@ -40,10 +44,5 @@ object ValidationRule {
       def errorsFor(in: A): List[ErrorMsg] = x.errorsFor(in) |+| y.errorsFor(in)
     }
   }
-
-}
-
-object Test {
-
 
 }

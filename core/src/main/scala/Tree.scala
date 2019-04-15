@@ -9,7 +9,7 @@ case class Tree[K,V](
 ) {
   def get(key: K): Either[ErrorTree,Tree[K,V]] = children.get(key) match {
     case Some(x) => x.asRight[ErrorTree]
-    case None    => Tree(Nil, Map(key.toString -> Tree[String,List[String]](List("required")))).asLeft[Tree[K,V]]
+    case None    => Tree(Nil, Map(key.toString -> Tree[String,List[ErrorMsg]](List(ErrorMsg("required"))))).asLeft[Tree[K,V]]
   }
 
   def add(key: K, newValue: Tree[K,V]): Tree[K,V] = Tree(value, children + (key -> newValue))
@@ -48,9 +48,13 @@ case class Tree[K,V](
   def prefix(k: K)(implicit monoid: Monoid[V]): Tree[K,V] = {
     if (isEmpty)
       this
-    else 
+    else
       Tree(monoid.empty, Map(k -> this))
   }
+
+  //TODO: Make stack safe
+  final def map[V2](f: V => V2): Tree[K,V2] =
+    Tree(f(value), children.mapValues(_.map(f)))
 
 }
 
@@ -58,5 +62,5 @@ object Tree {
 
   def empty[K,V](implicit monoid: Monoid[V]): Tree[K,V] =
     Tree(monoid.empty)
-  
+
 }

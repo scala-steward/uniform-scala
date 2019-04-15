@@ -13,7 +13,7 @@ package object logictable {
 
   type LogicTableStack = Fx.fx4[
     State[UniformCore, ?],
-    Either[NonEmptyList[ValidationError],?],
+    Either[NonEmptyList[ErrorMsg],?],
     Writer[String,?],
     List
   ]
@@ -24,11 +24,11 @@ package object logictable {
   implicit def partialToExamples[A](in: PartialFunction[String,List[A]]): Examples[A] = x => in(x)
 
   implicit class UniformListEffectOps[R, A](e: Eff[R, A]) {
-    type _either[Q] = Either[NonEmptyList[ValidationError],?] |= Q
+    type _either[Q] = Either[NonEmptyList[ErrorMsg],?] |= Q
     type _writer[Q] = Writer[String,?] |= Q
 
     def giveExamples[OUT, U : _either : _writer : _list](
-      reader: Examples[OUT]      
+      reader: Examples[OUT]
     )(
       implicit member: Member.Aux[Uniform[Unit,OUT,?], R, U]
     ): Eff[U, A] =
@@ -40,11 +40,10 @@ package object logictable {
                 val i: Eff[U,X] = for {
                   a <- ListEffect.values(reader(key.mkString("/")):_*)
                   _ <- WriterEffect.tell(s"${key.mkString(".")}:$a")
-                  va <- send(v(a).toEither.map{_.asInstanceOf[X]})
+                  va <- send(v.combinedValidation(a).toEither.map{_.asInstanceOf[X]})
                 } yield (va)
                 i
             }
         })
   }
-
 }

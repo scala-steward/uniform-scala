@@ -9,16 +9,16 @@
   <label class="govuk-label" for="@key">
     @messages(s"$key.heading")
   </label>
-  @errors.atPath(path.drop(1):_*).map { error => 
-    <span id="@key-error" class="govuk-error-message">
-      @messages(List(s"$key.$error", error))
-    </span>
+  @for(error <- errors.atPath(path.drop(1):_*).toList.flatten) {
+      <span id="@key-error" class="govuk-error-message">
+        @error.render(messages)
+      </span>
   }
-  @messages.get(s"$key.hint").map { hint => 
+  @messages.get(s"$key.hint").map { hint =>
     <span id="@key-hint" class="govuk-hint">
       @hint
     </span>
-  }    
+  }
   @content
 
 

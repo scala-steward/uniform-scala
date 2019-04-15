@@ -58,10 +58,6 @@ object JsInterpreter {
     type _state[Q]  = State[(DB,List[String]),?] |= Q
     type _either[Q] = Either[Page,?] |= Q
 
-    def validationToErrorTree[V](f: V => Validated[String,V]): V => Either[ErrorTree,V] = {
-      x => f(x).toEither.leftMap(Tree(_))
-    }
-
     def useForm[OUT, NEWSTACK](
       form: Form[OUT]
     )(
@@ -111,6 +107,13 @@ object JsInterpreter {
             val formData: Either[ErrorTree,OUT] =
               form.fromNode(keys.last, $("fieldset.uniform"))
 
+            def v(in: OUT): Either[ErrorTree, OUT] = {
+              validation.combinedValidation.errorsFor(in) match {
+                case Nil => in.asRight
+                case err => Tree[String,List[ErrorMsg]](err).asLeft
+              }
+            }
+
             def toTree(input: Option[Encoded]): Tree[String, List[String]] = action match {
               case Submit(_) =>
                 extractData($("#content"))
@@ -119,7 +122,7 @@ object JsInterpreter {
             }
 
             def toDbEntry(input: Option[Encoded]): Option[Either[ErrorTree,OUT]] =
-              input.map{d => form.decode(d).flatMap{validationToErrorTree(validation)}}
+              input.map{d => form.decode(d).flatMap{v}}
 
             for {
               encodedData <- db.encoded.get(keys)
@@ -128,7 +131,7 @@ object JsInterpreter {
               breadcrumbs <- breadcrumbs
               va <- (action,dbData) match {
                 case (Submit(`keys`),_) =>
-                  formData >>= validationToErrorTree(validation) match {
+                  formData >>= v match {
                     case Left(e) =>
                       left[NEWSTACK, Page, OUT](
                         Page(
@@ -167,7 +170,7 @@ object JsInterpreter {
                 case (Back(`keys`),_) | (Back(_),None | Some(Left(_))) | (Submit(_),Some(Right(_)))=>
                   val err = dbData match {
                         case Some(Left(e)) => e
-                        case _ => Tree.empty[String, String]
+                        case _ => Tree.empty[String, List[ErrorMsg]]
                       }
 
                       val dataTree: Tree[String, List[String]] = dbData match {
@@ -262,7 +265,7 @@ object JsInterpreter {
 
                   case Edit(ordinal) =>
                     subjourney("edit") {
-                      subJourneyP(elements, elements.get(ordinal)).into[NEWSTACK]
+                      subJourneyP(elements, elements.get(ordinal.toLong)).into[NEWSTACK]
                     } >>= {x =>
                       db.remove(id) >>
                       db.removeRecursive(id.dropRight(1) :+ "edit") >>

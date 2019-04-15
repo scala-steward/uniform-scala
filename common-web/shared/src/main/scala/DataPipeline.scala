@@ -9,12 +9,15 @@ import ltbs.uniform._
 
 package object parser {
 
+  def errorMsg(in: String): ErrorTree =
+    Tree(List(ErrorMsg(in)))
+
   implicit def stringParser: DataParser[String] = new DataParser[String] {
     def bind(in: Input): Either[ErrorTree,String] = in.value match {
-      case Nil => Tree(List("required")).asLeft
-      case empty::Nil if empty.trim == "" => Tree(List("required")).asLeft
+      case Nil => errorMsg("required").asLeft
+      case empty::Nil if empty.trim == "" => errorMsg("required").asLeft
       case s::Nil => s.asRight
-      case _ => Tree(List("badValue")).asLeft
+      case _ => errorMsg("badValue").asLeft
     }
 
     def unbind(a: String): Input = Tree(List(a))
@@ -22,10 +25,10 @@ package object parser {
 
   implicit def intParser: DataParser[Int] = new DataParser[Int] {
     def bind(in: Input): Either[ErrorTree,Int] = in.value match {
-      case ""::Nil | Nil => Tree(List("required")).asLeft
+      case ""::Nil | Nil => errorMsg("required").asLeft
       case s::Nil => Either.catchOnly[NumberFormatException](s.toInt)
-          .leftMap(_ => Tree(List("nonnumericformat")))
-      case _ => Tree(List("badValue")).asLeft
+          .leftMap(_ => errorMsg("nonnumericformat"))
+      case _ => errorMsg("badValue").asLeft
     }
 
     def unbind(a: Int): Input = Tree(List(a.toString))
@@ -33,10 +36,10 @@ package object parser {
 
   implicit def longParser: DataParser[Long] = new DataParser[Long] {
     def bind(in: Input): Either[ErrorTree,Long] = in.value match {
-      case ""::Nil | Nil => Left(Tree(List("required")))
+      case ""::Nil | Nil => errorMsg("required").asLeft
       case s::Nil => Either.catchOnly[NumberFormatException](s.toLong)
-          .leftMap(_ => Tree(List("nonnumericformat")))
-      case _ => Tree(List("badValue")).asLeft
+          .leftMap(_ => errorMsg("nonnumericformat"))
+      case _ => errorMsg("badValue").asLeft
     }
 
     def unbind(a: Long): Input = Tree(List(a.toString))
@@ -46,8 +49,8 @@ package object parser {
     def bind(in: Input): Either[ErrorTree,Boolean] = in.value match {
       case t::Nil if t.toUpperCase == "TRUE" => true.asRight
       case f::Nil if f.toUpperCase == "FALSE" => false.asRight
-      case Nil => Tree(List(required)).asLeft
-      case _ => Tree(List("badValue")).asLeft
+      case Nil => errorMsg(required).asLeft
+      case _ => errorMsg("badValue").asLeft
     }
 
     def unbind(a: Boolean): Input = Tree(List(a.toString.toUpperCase))
@@ -57,7 +60,7 @@ package object parser {
 
     def bind(in: Input): Either[ErrorTree,LocalDate] = {
       def numField(key: String) =
-        (in.get(key) >>= intParser.bind).leftMap{ x => 
+        (in.get(key) >>= intParser.bind).leftMap{ x =>
           Tree(Nil, Map(key -> x))
         }.toValidated
 
@@ -68,7 +71,7 @@ package object parser {
       ).tupled.toEither.flatMap{ case (y,m,d) =>
         Either.catchOnly[java.time.DateTimeException]{
           LocalDate.of(y,m,d)
-        }.leftMap(_ => Tree(List("badDate")))
+        }.leftMap(_ => errorMsg("badDate"))
       }
     }
 
@@ -84,7 +87,7 @@ package object parser {
   implicit def enumeratumParser[A <: EnumEntry](implicit enum: Enum[A]): DataParser[A] =
     new DataParser[A] {
       def bind(in: Input): Either[ErrorTree,A] = stringParser.bind(in) >>= { x =>
-        Either.catchOnly[NoSuchElementException](enum.withName(x)).leftMap{_ => Tree(List("badValue"))}
+        Either.catchOnly[NoSuchElementException](enum.withName(x)).leftMap{_ => errorMsg("badValue")}
       }
       def unbind(a: A): Input = Tree(List(a.toString))
     }
@@ -93,7 +96,7 @@ package object parser {
     new DataParser[Set[A]] {
       def bind(in: Input): Either[ErrorTree,Set[A]] = {
         in.value.map{ x =>
-          Either.catchOnly[NoSuchElementException](enum.withName(x)).leftMap{_ => Tree(List("badValue")): ErrorTree}
+          Either.catchOnly[NoSuchElementException](enum.withName(x)).leftMap{_ => errorMsg("badValue")}
         }.sequence.map{_.toSet}
       }
       def unbind(a: Set[A]): Input = Tree(a.map(_.toString).toList)

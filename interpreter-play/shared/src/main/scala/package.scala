@@ -14,23 +14,20 @@ package object playframework {
 
   type Encoded = String
 
-  type ValidationError = String
-  type ValidatedData[A] = Option[Validated[ValidationError, A]]
-
   implicit val playFormFunctor: Invariant[Form] = new Invariant[Form]{
     def imap[A, B](fa: Form[A])(f: A => B)(g: B => A): Form[B] =
       new Form[B](fa.mapping.transform(f, g), fa.data, fa.errors, fa.value.map(f))
   }
 
   implicit class RichList[ELEM](inner: List[ELEM]) {
-    def replace(ordinal: Int, elem: ELEM): List[ELEM] = 
-      if (ordinal >= 0 && ordinal < inner.size) 
+    def replace(ordinal: Int, elem: ELEM): List[ELEM] =
+      if (ordinal >= 0 && ordinal < inner.size)
         inner.take(ordinal) ++ {elem :: inner.drop(ordinal + 1)}
       else
         throw new IndexOutOfBoundsException
 
     def delete(ordinal: Int): List[ELEM] =
-      if (ordinal >= 0 && ordinal < inner.size) 
+      if (ordinal >= 0 && ordinal < inner.size)
         inner.take(ordinal) ++ inner.drop(ordinal + 1)
       else
         throw new IndexOutOfBoundsException

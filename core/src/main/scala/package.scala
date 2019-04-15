@@ -18,7 +18,7 @@ package object uniform {
   type _uniformTell[IN, R] = UniformTell[IN,?] |= R
 
   type Encoded = String
-  type ErrorTree = Tree[String,List[String]]
+  type ErrorTree = Tree[String,List[ErrorMsg]]
 
   type DB = Map[List[String],Encoded]
 
@@ -26,13 +26,11 @@ package object uniform {
     inner: UniformB[IN,OUT]
   ): Eff[R,OUT] =
     inner match {
-      case UniformB(key,tell,default,validation,customContent) => for { 
+      case UniformB(key,tell,default,validation,customContent) => for {
         predKeys <- core.map{_.path}
         x <- send[Uniform[IN,OUT,?], R, OUT](Uniform(predKeys :+ key,tell,default,validation,customContent))
       } yield (x)
     }
-
-  implicit def stringToValidationError(in: String): ValidationError = ValidationError(in)
 
   def core[STACK : _uniformCore] = get[STACK,UniformCore]
   def coreMod[STACK : _uniformCore](f: UniformCore => UniformCore) =
@@ -46,7 +44,7 @@ package object uniform {
 
   def pathPop[STACK : _uniformCore] = coreMod{ old =>
     old.copy(path = old.path.init)
-  }  
+  }
 
   def crumbPush[STACK : _uniformCore](crumb: List[String]) = coreMod{ old =>
     old.copy(breadcrumbs = old.breadcrumbs :+ crumb)
@@ -75,7 +73,7 @@ package object uniform {
       def removeRecursive[STACK : _uniformCore](key: List[String]): Eff[STACK,Unit] = coreMod{ old =>
         old.copy(state = old.state.filterNot(_._1.startsWith(key)))
       }
-      
+
     }
   }
 
@@ -87,6 +85,14 @@ package object uniform {
     a <- pathPush(path) >> inner
     _ <- pathPop
   } yield (a)
+
+  def uniformP[IN,OUT,R :_uniform[IN, OUT, ?]](
+    key: List[String],
+    tell: IN,
+    default: Option[OUT] = None,
+    validation: List[List[ValidationRule[OUT]]] = Nil
+  ): Eff[R, OUT] =
+    send[Uniform[IN,OUT,?], R, OUT](Uniform(key,tell,default,validation, Map.empty))
 
   def ask[OUT](key: String) =
     UniformB[Unit,OUT](key, (), None, Nil, Map.empty)
@@ -101,7 +107,7 @@ package object uniform {
     UniformB[IN,Nothing](key, value, None, Nil, Map.empty)
 
   implicit class RichMonoidOps[R, A](e: Eff[R, A])(implicit monoid: Monoid[A]) {
-    
+
     def emptyUnless(b: => Boolean): Eff[R, A] =
       if(b) e else Eff.pure[R,A](monoid.empty)
 
@@ -159,8 +165,6 @@ package object uniform {
         .fold(cats.Monoid[ValidationRule[A]].empty){(x,y) =>
           y andThen x
         }
-
   }
-
 
 }

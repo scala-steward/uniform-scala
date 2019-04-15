@@ -6,11 +6,10 @@ import cats.implicits._
 import org.atnos.eff._
 import org.atnos.eff.all.{none => _, _}
 import org.atnos.eff.syntax.all._
-import play.api.data.Form
 import ltbs.uniform._
 import play.api._
 import play.api.mvc._
-import play.twirl.api.{Html, HtmlFormat}
+import play.twirl.api.Html
 import ltbs.uniform._
 import ltbs.uniform.web._
 import scala.concurrent.{ ExecutionContext, Future }
@@ -29,10 +28,6 @@ trait PlayInterpreter extends Compatibility.PlayController {
   ): Html
 
   val log: Logger = Logger("uniform")
-
-  def formToValidated[A](f: Form[A]): ValidatedData[A] =
-    if (!f.hasErrors) f.value.map{_.valid}
-    else Some(f.errors.head.message.invalid)
 
   type PlayStack = Fx.fx2[State[UniformCore, ?], Either[Result, ?]]
 
@@ -125,16 +120,11 @@ trait PlayInterpreter extends Compatibility.PlayController {
                     val data: Encoded =
                       wmForm.receiveInput(request)
 
-                    def validationToErrorTree[V](f: V => ValidatedNel[ValidationError,V]): V => Either[ErrorTree,V] = {
-                      x => f(x).toEither.leftMap{err => Tree(err.toList)}
-                    }
-
                     def v(in: X): Either[ErrorTree, X] = {
-                      val validationResult = validation.combinedValidation(in.asInstanceOf[OUT])
-                      validationResult.toEither
-                        .leftMap{err => Tree(err.toList.map{case ErrorMsg(msg, args) => msg})}
-                        .map(_.asInstanceOf[X])
-//                      validationToErrorTree{validation.combinedValidation.apply}(in.asInstanceOf[OUT]).map{_.asInstanceOf[X]}
+                      validation.combinedValidation.errorsFor(in.asInstanceOf[OUT]) match {
+                        case Nil => in.asRight
+                        case err => Tree[String,List[ErrorMsg]](err).asLeft
+                      }
                     }
 
                     wmForm.decode(data).flatMap(v) match {
@@ -246,7 +236,7 @@ trait PlayInterpreter extends Compatibility.PlayController {
 
                   case Edit(ordinal) =>
                     subjourney("edit") {
-                      subJourneyP(elements, elements.get(ordinal)).into[NEWSTACK]
+                      subJourneyP(elements, elements.get(ordinal.toLong)).into[NEWSTACK]
                     } >>= {x =>
                       db.remove(id) >>
                       db.removeRecursive(id.dropRight(1) :+ "edit") >>
