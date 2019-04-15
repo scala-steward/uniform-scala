@@ -3,15 +3,11 @@ package ltbs.uniform.interpreters.playframework
 import cats.Monoid
 import cats.data._
 import cats.implicits._
-import org.atnos.eff._
-import org.atnos.eff.all.{none => _, _}
+import org.atnos.eff._, all.{none => _, _}
 import org.atnos.eff.syntax.all._
-import ltbs.uniform._
-import play.api._
-import play.api.mvc._
+import play.api._, mvc._
 import play.twirl.api.Html
-import ltbs.uniform._
-import ltbs.uniform.web._
+import ltbs.uniform._, web._
 import scala.concurrent.{ ExecutionContext, Future }
 
 trait PlayInterpreter extends Compatibility.PlayController {
@@ -47,7 +43,7 @@ trait PlayInterpreter extends Compatibility.PlayController {
     ): Eff[NEWSTACK, A] = useFormMap(_ => wmFormC)
 
     def useFormMap[IN, OUT, NEWSTACK](
-      wmFormOUT: List[String] => PlayForm[IN,OUT]
+      wmFormMap: List[String] => PlayForm[IN,OUT]
     )(
       implicit member: Member.Aux[Uniform[IN,OUT,?], STACK, NEWSTACK],
       stateM: _core[NEWSTACK],
@@ -57,17 +53,16 @@ trait PlayInterpreter extends Compatibility.PlayController {
     ): Eff[NEWSTACK, A] = e.translate(
       new Translate[Uniform[IN, OUT,?], NEWSTACK] {
         def apply[X](ax: Uniform[IN, OUT,X]): Eff[NEWSTACK, X] = {
-          val wmForm: PlayForm[IN,X] = wmFormOUT(ax.key).imap(_.asInstanceOf[X])(_.asInstanceOf[OUT])
 
-          val baseUrl = request.target.path.replaceFirst(targetId.mkString("/") + "$", "")
+          def real: Eff[NEWSTACK,OUT] = {
+            val baseUrl = request.target.path.replaceFirst(targetId.mkString("/") + "$", "")
 
-          def breadcrumbsToUrl(in: List[List[String]]): List[String] =
-            in.map { xs => baseUrl + xs.mkString("/") }
+            def breadcrumbsToUrl(in: List[List[String]]): List[String] =
+              in.map { xs => baseUrl + xs.mkString("/") }
 
-          ax match {
-            case Uniform(id, tell, default, validation, customContent) =>
-
-              val hybridMessages: UniformMessages[Html] = if (customContent.nonEmpty) {
+            val Uniform(id, tell, default, validation, customContent) = ax
+            val wmForm = wmFormMap(id)
+            val hybridMessages: UniformMessages[Html] = if (customContent.nonEmpty) {
                 val newMessageMap: Map[String, List[Html]] = customContent.mapValues{
                   case (key, args) =>
                     List(messages(request)(key,args:_*))
@@ -77,13 +72,13 @@ trait PlayInterpreter extends Compatibility.PlayController {
                 messages(request)
               }
 
-              for {
+            for {
                 g <- core
                 method = request.method.toLowerCase
                 UniformCore(state, breadcrumbs, _) = g
                 dbObject: Option[OUT] = {
                   val o = state.get(id).flatMap(
-                    wmFormOUT(id).decode(_).flatMap(validation.combinedValidation(_).toEither) match {
+                    wmForm.decode(_).flatMap(validation.combinedValidation(_).toEither) match {
                       case Left(e) =>
                         log.warn(s"$id - serialised data present, but failed validation - $e")
                         None
@@ -95,17 +90,17 @@ trait PlayInterpreter extends Compatibility.PlayController {
                 ret <- (method, dbObject, targetId) match {
                   case ("get", None, `id`) =>
                     log.info(s"$id - nothing in database, step in URI, render empty form")
-                    left[NEWSTACK, Result, X](Ok(renderForm(id, Tree.empty,
+                    left[NEWSTACK, Result, OUT](Ok(renderForm(id, Tree.empty,
                       wmForm.render(id.last, tell, None, request, hybridMessages),
                       breadcrumbsToUrl(breadcrumbs), request, hybridMessages
                     )))
 
                   case ("get", Some(o), `id`) =>
-                    val encoded = wmForm.encode(o.asInstanceOf[X]) // FormUrlEncoded.readString(wmForm.encode(o)).prefix(id).writeString
+                    val encoded = wmForm.encode(o) // FormUrlEncoded.readString(wmForm.encode(o)).prefix(id).writeString
                     log.info(s"""|$id - something in database, step in URI, user revisiting old page, render filled in form
                                  |\t\t data: $o
                                  |\t\t encoded: $encoded """.stripMargin)
-                    left[NEWSTACK, Result, X](Ok(
+                    left[NEWSTACK, Result, OUT](Ok(
                       renderForm(id, Tree.empty,
                       wmForm.render(id.last, tell, Some(encoded), request, hybridMessages),
                       breadcrumbsToUrl(breadcrumbs), request, hybridMessages
@@ -114,14 +109,14 @@ trait PlayInterpreter extends Compatibility.PlayController {
                   case ("get", Some(data), _) =>
                     log.info(s"$id - something in database, not step in URI, pass through")
                     crumbPush(id) >>
-                    Eff.pure[NEWSTACK, X](data.asInstanceOf[X])
+                    Eff.pure[NEWSTACK, OUT](data)
 
                   case ("post", _, `id`) =>
                     val data: Encoded =
                       wmForm.receiveInput(request)
 
-                    def v(in: X): Either[ErrorTree, X] = {
-                      validation.combinedValidation.errorsFor(in.asInstanceOf[OUT]) match {
+                    def v(in: OUT): Either[ErrorTree, OUT] = {
+                      validation.combinedValidation.errorsFor(in) match {
                         case Nil => in.asRight
                         case err => Tree[String,List[ErrorMsg]](err).asLeft
                       }
@@ -132,7 +127,7 @@ trait PlayInterpreter extends Compatibility.PlayController {
                         log.info(s"$id - form submitted, step in URI, validation failure")
                         log.info(s"  errors: $errors")
                         log.info(s"  data: $data")
-                        left[NEWSTACK, Result, X](BadRequest(renderForm(id, errors,
+                        left[NEWSTACK, Result, OUT](BadRequest(renderForm(id, errors,
                           wmForm.render(id.last, tell, Some(data), request, hybridMessages, errors),
                           breadcrumbsToUrl(breadcrumbs), request, hybridMessages
                         )))
@@ -140,19 +135,19 @@ trait PlayInterpreter extends Compatibility.PlayController {
                         log.info(s"$id - form submitted, step in URI, validation pass")
                         (db.encoded(id) = wmForm.encode(o)) >>
                         crumbPush(id) >>
-                        Eff.pure[NEWSTACK, X](o)
+                        Eff.pure[NEWSTACK, OUT](o)
 
                     }
 
                   case ("post", Some(_), _) if breadcrumbs.contains(targetId) =>
                     log.info(s"$id - something in database, previous page submitted")
                     crumbPush(id) >>
-                    left[NEWSTACK, Result, X](Redirect(s"${baseUrl}${id.mkString("/")}"))
+                    left[NEWSTACK, Result, OUT](Redirect(s"${baseUrl}${id.mkString("/")}"))
 
                   case ("post", Some(data), _) =>
                     log.info(s"$id - something in database, posting, not step in URI nor previous page -> pass through")
                     crumbPush(id) >>
-                      Eff.pure[NEWSTACK,X](data.asInstanceOf[X])
+                      Eff.pure[NEWSTACK,OUT](data)
 
                   case ("post", _, _) | ("get", _, _) =>
                     log.warn(
@@ -161,10 +156,12 @@ trait PlayInterpreter extends Compatibility.PlayController {
                           |\t\t dbObject:$dbObject
                           |\t\t targetId:$targetId""".stripMargin)
 
-                    left[NEWSTACK, Result, X](Redirect(s"${baseUrl}${id.mkString("/")}"))
+                    left[NEWSTACK, Result, OUT](Redirect(s"${baseUrl}${id.mkString("/")}"))
                 }
-              } yield ret
+            } yield ret
           }
+
+          real.map(_.asInstanceOf[X])
         }
       }
     )
@@ -201,12 +198,15 @@ trait PlayInterpreter extends Compatibility.PlayController {
     ): Eff[NEWSTACK,A] = e.translate(
       new Translate[UniformAsk[List[OUT],?], NEWSTACK] {
 
-        def serialise(in: List[OUT]): String = FormUrlEncoded.fromInputTree(parser.unbind(in)).writeString
-        def deserialise(in: String): List[OUT] = parser.bind(FormUrlEncoded.readString(in).toInputTree) match {
-          case Left(t) if t.isEmpty => Nil
-          case Left(e) => throw new IllegalStateException(e.toString)
-          case Right(r) => r
-        }
+        def serialise(in: List[OUT]): String =
+          FormUrlEncoded.fromInputTree(parser.unbind(in)).writeString
+
+        def deserialise(in: String): List[OUT] =
+          parser.bind(FormUrlEncoded.readString(in).toInputTree) match {
+            case Left(t) if t.isEmpty => Nil
+            case Left(e) => throw new IllegalStateException(e.toString)
+            case Right(r) => r
+          }
 
         def apply[X](ax: UniformAsk[List[OUT],X]): Eff[NEWSTACK, X] = {
 
@@ -236,7 +236,8 @@ trait PlayInterpreter extends Compatibility.PlayController {
 
                   case Edit(ordinal) =>
                     subjourney("edit") {
-                      subJourneyP(elements, elements.get(ordinal.toLong)).into[NEWSTACK]
+                      subJourneyP(elements, elements.get(ordinal.toLong)).
+                        into[NEWSTACK]
                     } >>= {x =>
                       db.remove(id) >>
                       db.removeRecursive(id.dropRight(1) :+ "edit") >>
@@ -245,7 +246,8 @@ trait PlayInterpreter extends Compatibility.PlayController {
 
                   case Delete(ordinal) =>
                     subjourney("delete") {
-                      removeConfirmation(elements, elements(ordinal)).into[NEWSTACK]
+                      removeConfirmation(elements, elements(ordinal)).
+                        into[NEWSTACK]
                     } >>= {
                       if (_) {
                         write(elements.delete(ordinal)) >>
@@ -269,8 +271,6 @@ trait PlayInterpreter extends Compatibility.PlayController {
       }
     )
   }
-
-  implicit val scheduler = ExecutorServices.schedulerFromGlobalExecutionContext
 
   def runWeb[A](
     program: Eff[PlayStack, A],
@@ -347,10 +347,23 @@ trait PlayInterpreter extends Compatibility.PlayController {
       }
     }
 
-    def decode(out: ltbs.uniform.Encoded): Either[ltbs.uniform.ErrorTree,ASK] = inner(dummyMessages).decode(out)
-    def encode(in: ASK): ltbs.uniform.Encoded = inner(dummyMessages).encode(in)
-    def receiveInput(data: play.api.mvc.Request[play.api.mvc.AnyContent]): ltbs.uniform.Encoded = inner(dummyMessages).receiveInput(data)
-    def render(key: String,tell: TELL,existing: Option[ltbs.uniform.Encoded],data: play.api.mvc.Request[play.api.mvc.AnyContent], messages: UniformMessages[Html], errors: ltbs.uniform.ErrorTree): play.twirl.api.Html = inner(messages).render(key,tell,existing,data,messages, errors)
+    def decode(out: Encoded): Either[ErrorTree,ASK] =
+      inner(dummyMessages).decode(out)
+
+    def encode(in: ASK): Encoded =
+      inner(dummyMessages).encode(in)
+
+    def receiveInput(data: Request[AnyContent]): Encoded =
+      inner(dummyMessages).receiveInput(data)
+
+    def render(
+      key: String,
+      tell: TELL,
+      existing: Option[Encoded],
+      data: Request[AnyContent],
+      messages: UniformMessages[Html],
+      errors: ErrorTree
+    ): Html = inner(messages).render(key,tell,existing,data,messages, errors)
 
   }
 
