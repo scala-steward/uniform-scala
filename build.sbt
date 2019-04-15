@@ -141,7 +141,6 @@ lazy val `common-web` = crossProject(JSPlatform, JVMPlatform)
     libraryDependencies ++= Seq(
       "com.chuusai" %%% "shapeless" % "2.3.3",
       "com.github.mpilquist" %%% "simulacrum" % "0.14.0",
-      "com.typesafe.play" %%% "twirl-api" % "1.3.15",
       "com.beachape" %%% "enumeratum" % "1.5.13",
       "org.scalatest" %%% "scalatest" % "3.0.5" % "test"
     )
@@ -362,4 +361,3 @@ lazy val `sbt-gforms-to-uniform-converter` = project
   .enablePlugins(SbtPlugin)
 
 crossSbtVersions := Vector("0.13.17", "1.2.8")
-

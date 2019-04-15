@@ -39,13 +39,6 @@ class WindowTaxController @Inject()(
     views.html.chrome(key.last, errors, form, breadcrumbs)(messagesIn, request)
   }
 
-  def listingPage[A](
-    key: List[String],
-    errors: ErrorTree,
-    elements: List[A],
-    messages: UniformMessages[Html]
-  )(implicit evidence$1: Htmlable[A]): Html = ???
-
   val persistence = new Persistence {
     private var data: DB = Monoid[DB].empty
     def dataGet: Future[DB] = Future.successful(data)

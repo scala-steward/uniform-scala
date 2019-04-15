@@ -5,7 +5,16 @@ import enumeratum._
 import play.twirl.api.Html
 import cats.implicits._
 
-package object govuk extends InferForm {
+object MonoidHtml {
+  implicit val htmlMonoidInstance: cats.Monoid[Html] = new cats.Monoid[Html] {
+    def empty: Html = Html("")
+    def combine(a: Html, b: Html):Html = Html(a.toString ++ b.toString)
+  }
+}
+
+import MonoidHtml._
+
+package object govuk extends InferForm[Html] {
 
   def errorSummary(key: String, values: Input, errors: ErrorTree, messages: UniformMessages[Html]): Html =
     html.errorsummary(key, values, errors, messages)
@@ -108,7 +117,7 @@ package object govuk extends InferForm {
     }
   }
 
-  val jsListControlHtmlField = new ltbs.uniform.web.HtmlField[ListControl] {
+  val jsListControlHtmlField = new HtmlField[ListControl] {
     def render(key: String, values: Input, errors: ErrorTree, messages: UniformMessages[Html]) = {
       val path = key.split("[.]").filter(_.nonEmpty).tail
       val existing: Option[String] = values.atPath(path:_*).flatMap{_.headOption}
@@ -130,7 +139,7 @@ package object govuk extends InferForm {
     }
   }
 
-  val jdkListControlHtmlField = new ltbs.uniform.web.HtmlField[ListControl] {
+  val jdkListControlHtmlField = new HtmlField[ListControl] {
     def render(key: String, values: Input, errors: ErrorTree, messages: UniformMessages[Html]) = {
       val path = key.split("[.]").filter(_.nonEmpty).tail
       val existing: Option[String] = values.atPath(path:_*).flatMap{_.headOption}

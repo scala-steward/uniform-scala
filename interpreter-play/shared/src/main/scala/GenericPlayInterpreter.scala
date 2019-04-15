@@ -5,17 +5,15 @@ import cats.data._
 import cats.implicits._
 import org.atnos.eff._, all.{none => _, _}
 import org.atnos.eff.syntax.all._
-import play.api._, mvc._
+import play.api._, mvc._, http.Writeable
 import ltbs.uniform._, web._
 import scala.concurrent.{ ExecutionContext, Future }
-import play.twirl.api.Html
 
-trait PlayInterpreter extends Compatibility.PlayController {
+case class PlayWriteable[Html: Monoid : Writeable]() {
 
-  type PlayForm[TELL,ASK] = SimpleInteractionForm[Request[AnyContent],TELL,ASK,Html]
+type PlayForm[TELL,ASK] = SimpleInteractionForm[Request[AnyContent],TELL,ASK,Html]
 
-  //implicit val writeable: play.api.http.Writeable[Html]
-  //implicit val monoid: cats.Monoid[Html]
+trait Interpreter extends Compatibility.PlayController {
 
   def messages(request: Request[AnyContent]): UniformMessages[Html]
 
@@ -299,77 +297,23 @@ trait PlayInterpreter extends Compatibility.PlayController {
       }
     }
 
-  def listingTable[E](csrf: Html)(
-    key: String,
-    render: (String, List[(Html, Option[Html], Option[Html])], Int, Int, UniformMessages[Html]) => Html,
-    elementToHtml: E => Html,
-    messages: UniformMessages[Html]
-  )(elements: List[E]): Html = {
+  // def automatic[TELL,ASK](implicit
+  //   parser: DataParser[ASK],
+  //   html: HtmlForm[ASK,Html],
+  //   renderTell: (TELL, String) => Html
+  // ): PlayForm[TELL,ASK] =
+  //   UrlEncodedHtmlForm[TELL,ASK,Html](parser, html, renderTell).
+  //     transformIn
+  // { request =>
+  //   val urlEncodedData =
+  //     request.body.asFormUrlEncoded.getOrElse(Map.empty)
+  //   val (first: String,_) =
+  //     urlEncodedData.find(_._1 != "csrfToken").getOrElse(("",""))
+  //   val key = first.takeWhile(_ != '.')
+  //   urlEncodedData.forestAtPath(key)
+  // }
 
-    def edit(i: Int) = Html(
-      s"""|<form action="$key" method="post"> $csrf
-          |  <input type="hidden" name="$key.Edit.ordinal" value="$i" />
-          |    <button type="submit" name="$key" value="Edit" class="link-button">
-          |      Edit
-          |    </button>
-          |</form>
-          |""".stripMargin
-    )
 
-    def delete(i: Int) = Html(
-      s"""|<form action="$key" method="post"> $csrf
-          |  <input type="hidden" name="$key.Delete.ordinal" value="$i" />
-          |    <button type="submit" name="$key" value="Delete" class="link-button">
-          |      Delete
-          |    </button>
-          |</form>
-          |""".stripMargin
-    )
 
-    render(key, elements.zipWithIndex.map{
-      case (x,i) => (elementToHtml(x), Some(edit(i)), Some(delete(i)))
-    }, 0, Int.MaxValue, messages)
-
-  }
-
-  private val dummyMessages = UniformMessages.echo.map(Html(_))
-
-  def automatic[TELL,ASK]( implicit
-    parser: DataParser[ASK],
-    html: HtmlForm[ASK,Html],
-    renderTell: (TELL, String) => Html
-  ): PlayForm[TELL,ASK] = new PlayForm[TELL,ASK] {
-    def inner(m: UniformMessages[Html]): PlayForm[TELL,ASK] = {
-      UrlEncodedHtmlForm[TELL, ASK, Html](parser, html, renderTell, m).
-        transformIn { request =>
-
-        val urlEncodedData =
-          request.body.asFormUrlEncoded.getOrElse(Map.empty)
-        val (first: String,_) =
-          urlEncodedData.find(_._1 != "csrfToken").getOrElse(("",""))
-        val key = first.takeWhile(_ != '.')
-        urlEncodedData.forestAtPath(key)
-      }
-    }
-
-    def decode(out: Encoded): Either[ErrorTree,ASK] =
-      inner(dummyMessages).decode(out)
-
-    def encode(in: ASK): Encoded =
-      inner(dummyMessages).encode(in)
-
-    def receiveInput(data: Request[AnyContent]): Encoded =
-      inner(dummyMessages).receiveInput(data)
-
-    def render(
-      key: String,
-      tell: TELL,
-      existing: Option[Encoded],
-      data: Request[AnyContent],
-      messages: UniformMessages[Html],
-      errors: ErrorTree
-    ): Html = inner(messages).render(key,tell,existing,data,messages, errors)
-
-  }
-
+}
 }

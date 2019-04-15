@@ -10,6 +10,11 @@ import play.api._
 
 package object playframework {
 
+  implicit val htmlMonoidInstance: cats.Monoid[Html] = new cats.Monoid[Html] {
+    def empty: Html = Html("")
+    def combine(a: Html, b: Html):Html = Html(a.toString ++ b.toString)
+  }
+
   type PlayForm[TELL,ASK] = SimpleInteractionForm[Request[AnyContent],TELL,ASK,Html]
 
   type Encoded = String

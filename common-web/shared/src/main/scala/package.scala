@@ -2,18 +2,12 @@ package ltbs.uniform
 
 import cats.implicits._
 import cats.{Invariant,Monoid}
-import play.twirl.api.Html
 import scala.language.implicitConversions
 
 package object web {
 
   type FormUrlEncoded = Map[String, Seq[String]]
   type Input = Tree[String, List[String]]
-
-  implicit val htmlMonoidInstance = new Monoid[Html] {
-    def empty: Html = Html("")
-    def combine(a: Html, b: Html):Html = Html(a.toString ++ b.toString)
-  }
 
   implicit def richFormUrlEncoded(in: FormUrlEncoded): RichFormUrlEncoded =
     new RichFormUrlEncoded(in)
@@ -23,12 +17,12 @@ package object web {
       fa.transform(f map (_.asRight))(g)
   }
 
-  def UrlEncodedHtmlForm[TELL,ASK](
+  def UrlEncodedHtmlForm[TELL,ASK, Html: Monoid](
     parser: DataParser[ASK],
-    html: HtmlForm[ASK],
+    html: HtmlForm[ASK, Html],
     renderTell: (TELL, String) => Html,
     messages: UniformMessages[Html]
-  ): SimpleInteractionForm[FormUrlEncoded,TELL,ASK,Html] = { 
+  ): SimpleInteractionForm[FormUrlEncoded,TELL,ASK,Html] = {
     val underlying = new InputHtmlForm(parser, html, renderTell, messages)
     underlying.transformIn(_.toInputTree)
   }
