@@ -3,7 +3,7 @@
 @(key: String, values: Input, errors: ErrorTree, messages: UniformMessages[Html])
 
 
-@if(errors.nonEmpty) { 
+@if(errors.nonEmpty) {
 
 <div class="govuk-error-summary" aria-labelledby="error-summary-title" role="alert" tabindex="-1" data-module="error-summary">
 
@@ -12,10 +12,13 @@
   </h2>
   <div class="govuk-error-summary__body">
     <ul class="govuk-list govuk-error-summary__list">
-      @for((path, errormsg) <- errors.flatTree) { 
-      <li>
-        <a href="#@{(key :: path).mkString(".")}">@messages.decompose(((key :: path) :+ errormsg).mkString("."))</a>
-      </li>
+
+      @for((path, fieldErrors) <- errors.flatTree) {
+        @for(error <- fieldErrors) {
+          <li>
+            <a href="#@{(key :: path).mkString(".")}">@messages.decompose(((key :: path) :+ error.msg).mkString("."), error.args)</a>
+          </li>
+        }
       }
     </ul>
   </div>

@@ -16,10 +16,13 @@ trait ValidationRule[A] {
     case None => in.valid
     case Some(nel) => nel.invalid
   }
-  def andThen(that: ValidationRule[A]): ValidationRule[A] = new ValidationRule[A] {
-    def errorsFor(in: A): List[ErrorMsg] = this.errorsFor(in) match {
-      case Nil => that.errorsFor(in)
-      case xs  => xs
+  def andThen(that: ValidationRule[A]): ValidationRule[A] = {
+    val orig = this
+    new ValidationRule[A] {
+      def errorsFor(in: A): List[ErrorMsg] = orig.errorsFor(in) match {
+        case Nil => that.errorsFor(in)
+        case xs  => xs
+      }
     }
   }
 }
@@ -43,6 +46,10 @@ object ValidationRule {
     def combine(x: ValidationRule[A], y: ValidationRule[A]) = new ValidationRule[A] {
       def errorsFor(in: A): List[ErrorMsg] = x.errorsFor(in) |+| y.errorsFor(in)
     }
+  }
+
+  def alwaysFail[A]: ValidationRule[A] = new ValidationRule[A] {
+    def errorsFor(in: A): List[ErrorMsg] = ErrorMsg("none-shall-pass") :: Nil
   }
 
 }

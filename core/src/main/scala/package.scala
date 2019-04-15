@@ -103,8 +103,8 @@ package object uniform {
   def dialogue[IN,OUT](key: String)(value: IN) =
     UniformB[IN,OUT](key, value, None, Nil, Map.empty)
 
-  def end[IN](key: String)(value: IN) =
-    UniformB[IN,Nothing](key, value, None, Nil, Map.empty)
+  def end[IN,OUT](key: String)(value: IN) =
+    UniformB[IN,OUT](key, value, None, List(ValidationRule.alwaysFail[OUT]) :: Nil, Map.empty)
 
   implicit class RichMonoidOps[R, A](e: Eff[R, A])(implicit monoid: Monoid[A]) {
 

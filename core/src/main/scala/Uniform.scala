@@ -11,9 +11,14 @@ case class UniformB[IN, OUT] private (
   customContent: Map[String,(String,List[Any])]
 ) {
 
-  def validating(newRules: ValidationRule[OUT]*): UniformB[IN, OUT] = this.copy(
+  def validate(newRules: ValidationRule[OUT]*): UniformB[IN, OUT] = this.copy(
     validation=newRules.toList :: validation
   )
+
+  def validating(msg: String, pred: Function[OUT,Boolean]): UniformB[IN, OUT] = {
+    val newRules = ValidationRule.fromPred(pred, ErrorMsg(msg)) :: Nil
+    this.copy(validation=newRules :: validation)
+}
 
   def combinedValidation: ValidationRule[OUT] =
     validation

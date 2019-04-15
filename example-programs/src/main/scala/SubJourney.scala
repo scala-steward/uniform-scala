@@ -10,12 +10,12 @@ object SubJourneyExample {
       : _uniformAsk[Int,?]
       : _uniform[Int,Unit,?]
   ]: Eff[R, Int] = for {
-    one <- subjourney("one") { ask[Int]("a") } 
+    one <- subjourney("one") { ask[Int]("a") }
     two <- subjourney("two") {
              for {
                twoa <- ask[Int]("a")
                twob <- ask[Int]("b")
-               _    <- ask[Int]("c") >>= {end("errorPage")(_)}
+               _    <- ask[Int]("c") >>= {end("errorPage")(_).in[R]}
              } yield (twoa + twob)
     }
     three <- ask[Int]("three")
