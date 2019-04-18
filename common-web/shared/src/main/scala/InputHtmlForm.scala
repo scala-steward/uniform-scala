@@ -2,11 +2,10 @@ package ltbs.uniform.web
 
 import ltbs.uniform._
 
-class InputHtmlForm[TELL,ASK, Html: cats.Monoid](
+class InputHtmlForm[TELL,ASK, Html](
   parser: DataParser[ASK],
   html: HtmlForm[ASK, Html],
-  renderTell: (TELL, String) => Html,
-  messages: UniformMessages[Html]
+  renderTell: (TELL, String) => Html
 ) extends SimpleInteractionForm[Input,TELL,ASK,Html] {
 
   def decode(out: Encoded): Either[ErrorTree,ASK] =

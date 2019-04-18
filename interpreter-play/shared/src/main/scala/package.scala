@@ -1,6 +1,5 @@
 package ltbs.uniform.interpreters
 
-import cats.data._
 import cats.Invariant
 import play.api.data.Form
 import play.api.mvc.{ Request, AnyContent }

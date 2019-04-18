@@ -149,4 +149,37 @@ package object govuk extends InferForm[Html] {
     }
   }
 
+  def listingTable[E](csrf: Html)(
+    key: String,
+    render: (String, List[(Html, Option[Html], Option[Html])], Int, Int, UniformMessages[Html]) => Html,
+    elementToHtml: E => Html,
+    messages: UniformMessages[Html]
+  )(elements: List[E]): Html = {
+
+    def edit(i: Int) = Html(
+      s"""|<form action="$key" method="post"> $csrf
+          |  <input type="hidden" name="$key.Edit.ordinal" value="$i" />
+          |    <button type="submit" name="$key" value="Edit" class="link-button">
+          |      Edit
+          |    </button>
+          |</form>
+          |""".stripMargin
+    )
+
+    def delete(i: Int) = Html(
+      s"""|<form action="$key" method="post"> $csrf
+          |  <input type="hidden" name="$key.Delete.ordinal" value="$i" />
+          |    <button type="submit" name="$key" value="Delete" class="link-button">
+          |      Delete
+          |    </button>
+          |</form>
+          |""".stripMargin
+    )
+
+    render(key, elements.zipWithIndex.map{
+      case (x,i) => (elementToHtml(x), Some(edit(i)), Some(delete(i)))
+    }, 0, Int.MaxValue, messages)
+
+  }
+
 }

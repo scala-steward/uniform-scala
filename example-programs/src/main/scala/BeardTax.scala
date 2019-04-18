@@ -47,7 +47,9 @@ object BeardTax {
   ]: Eff[R, Int] =
     for {
       memberOfPublic <- ask[Option[MemberOfPublic]]("is-public")
-        .validating("born-in-future", _.map{_.age.isBefore(Date.now)}.getOrElse(true))
+        .validating( "born-in-future", { case Some(MemberOfPublic(_,_,bornOn)) if bornOn.isBefore(Date.now) => false; case _ => true} )
+        .validating( "cant-be-called-fred", { case Some(MemberOfPublic("fred",_,_)) => false; case _ => true })
+        .validating( "cant-be-called-smith", {case Some(MemberOfPublic(_,"smith",_)) => false; case _ => true} )
       beardStyle     <- ask[BeardStyle]("beard-style")
         .withCustomContentAndArgs(
           "beard-style.heading" -> {memberOfPublic match {
@@ -57,7 +59,7 @@ object BeardTax {
               ("beard-style.heading.sycophantic",Nil)
           }} )
       beardLength    <- ask[BeardLength]("beard-length-mm")
-        .validating("lower-exceeds-higher", {case (l,h) => l < h })
+        .validating( "lower-exceeds-higher", {case (l,h) => h >= l})
         .emptyUnlessPred(memberOfPublic.isDefined)
     } yield costOfBeard(beardStyle, beardLength)
 

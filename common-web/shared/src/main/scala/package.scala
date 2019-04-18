@@ -17,13 +17,12 @@ package object web {
       fa.transform(f map (_.asRight))(g)
   }
 
-  def UrlEncodedHtmlForm[TELL,ASK, Html: Monoid](
+  def UrlEncodedHtmlForm[TELL,ASK, Html](
     parser: DataParser[ASK],
     html: HtmlForm[ASK, Html],
-    renderTell: (TELL, String) => Html,
-    messages: UniformMessages[Html]
+    renderTell: (TELL, String) => Html
   ): SimpleInteractionForm[FormUrlEncoded,TELL,ASK,Html] = {
-    val underlying = new InputHtmlForm(parser, html, renderTell, messages)
+    val underlying = new InputHtmlForm(parser, html, renderTell)
     underlying.transformIn(_.toInputTree)
   }
 
