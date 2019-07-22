@@ -16,6 +16,8 @@ abstract class PlayInterpreter[Html: Writeable: Monoid](
   type PlayAsk[A] = GenericWebAsk[A, Html]
   type PlayTell[A] = GenericWebTell[A, Html]
 
+  lazy val db = LowLevelDbAccess
+
   def messages(
     request: Request[AnyContent],
     customContent: Map[String,(String,List[Any])]
